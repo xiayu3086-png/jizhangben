@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记账本 - 会记住数据</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: "Microsoft YaHei";
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        .box {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        input[name="desc"] { width: 180px; }
+        input[name="amount"] { width: 100px; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { opacity: 0.9; }
+        .export-btn {
+            background: #2196F3;
+            margin-top: 15px;
+        }
+        .clear-btn {
+            background: #e74c3c;
+            margin-top: 10px;
+            margin-left: 10px;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .summary-item { text-align: center; }
+        .summary-item .label { font-size: 13px; color: #888; }
+        .summary-item .value { font-size: 22px; font-weight: bold; }
+        .income { color: #2e7d32; }
+        .expense { color: #c62828; }
+        .balance { color: #1565c0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #4472C4;
+            color: white;
+            padding: 8px;
+        }
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+        }
+        .type-income { color: #2e7d32; font-weight: bold; }
+        .type-expense { color: #c62828; font-weight: bold; }
+        .delete-btn {
+            background: #e74c3c;
+            padding: 3px 8px;
+            font-size: 12px;
+        }
+
+        /* 手机适配 */
+        @media (max-width: 600px) {
+            .box {
+                width: 100%;
+                padding: 15px;
+            }
+            .input-row {
+                flex-direction: column;
+                align-items: center;
+            }
+            .input-row select,
+            .input-row input {
+                width: 90%;
+            }
+            input[name="desc"] { width: 90%; }
+            input[name="amount"] { width: 90%; }
+            .summary {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .summary-item .value {
+                font-size: 18px;
+            }
+            table {
+                font-size: 12px;
+            }
+            th, td {
+                padding: 5px 3px;
+            }
+            h2 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>📒 记账本</h2>
+        <hr>
+
+        <div class="input-row">
+            <select id="type">
+                <option value="收入">收入</option>
+                <option value="支出">支出</option>
+            </select>
+            <input type="text" id="desc" placeholder="说明（如：工资、吃饭）">
+            <input type="number" id="amount" placeholder="金额">
+            <button onclick="addRecord()">记一笔</button>
+        </div>
+
+        <div class="summary">
+            <div class="summary-item">
+                <div class="label">总收入</div>
+                <div class="value income" id="totalIncome">0</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">总支出</div>
+                <div class="value expense" id="totalExpense">0</div>
+            </div>
+            <div class="summary-item">
+                <div class="label">余额</div>
+                <div class="value balance" id="balance">0</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>类型</th>
+                    <th>说明</th>
+                    <th>金额</th>
+                    <th>时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+
+        <button class="export-btn" onclick="downloadExcel()">📥 导出 Excel</button>
+        <button class="clear-btn" onclick="clearAll()">🗑️ 清空所有记录</button>
+    </div>
+
+    <script>
+        let records = JSON.parse(localStorage.getItem('records') || '[]');
+
+        function addRecord() {
+            let type = document.getElementById('type').value;
+            let desc = document.getElementById('desc').value;
+            let amount = Number(document.getElementById('amount').value);
+
+            if (!desc || !amount) {
+                alert('请填写完整！');
+                return;
+            }
+
+            let now = new Date();
+            let time = now.getMonth() + 1 + '/' + now.getDate() + ' ' + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+
+            records.push({
+                type: type,
+                desc: desc,
+                amount: amount,
+                time: time
+            });
+
+            localStorage.setItem('records', JSON.stringify(records));
+
+            document.getElementById('desc').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('desc').focus();
+
+            showTable();
+        }
+
+        function showTable() {
+            let tbody = document.getElementById('tbody');
+            tbody.innerHTML = '';
+
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            for (let i = 0; i < records.length; i++) {
+                let r = records[i];
+                if (r.type === '收入') {
+                    totalIncome += r.amount;
+                } else {
+                    totalExpense += r.amount;
+                }
+
+                let tr = document.createElement('tr');
+                tr.innerHTML = '<td class="' + (r.type === '收入' ? 'type-income' : 'type-expense') + '">' + r.type + '</td>'
+                    + '<td>' + r.desc + '</td>'
+                    + '<td>' + r.amount + '</td>'
+                    + '<td>' + r.time + '</td>'
+                    + '<td><button class="delete-btn" onclick="deleteRecord(' + i + ')">删除</button></td>';
+                tbody.appendChild(tr);
+            }
+
+            document.getElementById('totalIncome').textContent = totalIncome;
+            document.getElementById('totalExpense').textContent = totalExpense;
+            document.getElementById('balance').textContent = totalIncome - totalExpense;
+        }
+
+        function deleteRecord(index) {
+            records.splice(index, 1);
+            localStorage.setItem('records', JSON.stringify(records));
+            showTable();
+        }
+
+        function clearAll() {
+            if (confirm('确定清空所有记录吗？')) {
+                records = [];
+                localStorage.removeItem('records');
+                showTable();
+            }
+        }
+
+        function downloadExcel() {
+            if (records.length === 0) {
+                alert('没有数据可导出！');
+                return;
+            }
+
+            let data = [];
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            records.forEach(function(r, i) {
+                if (r.type === '收入') {
+                    totalIncome += r.amount;
+                } else {
+                    totalExpense += r.amount;
+                }
+                data.push({
+                    '序号': i + 1,
+                    '类型': r.type,
+                    '说明': r.desc,
+                    '金额': r.amount,
+                    '时间': r.time
+                });
+            });
+
+            data.push({ '序号': '', '类型': '总收入', '说明': '', '金额': totalIncome, '时间': '' });
+            data.push({ '序号': '', '类型': '总支出', '说明': '', '金额': totalExpense, '时间': '' });
+            data.push({ '序号': '', '类型': '余额', '说明': '', '金额': totalIncome - totalExpense, '时间': '' });
+
+            let ws = XLSX.utils.json_to_sheet(data);
+            let wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '记账明细');
+            XLSX.writeFile(wb, '记账本.xlsx');
+        }
+
+        showTable();
+    </script>
+</body>
+</html>
